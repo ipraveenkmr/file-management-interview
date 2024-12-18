@@ -18,6 +18,10 @@ class Document(BaseModel):
     filename: str
     content: str
     uploaded_at: datetime
+    
+class UpdateDocument(BaseModel):
+    filename: str
+    content: str
 
 # Routes
 @router.post("/upload/")
@@ -87,4 +91,25 @@ async def delete_file(filename: str):
         return {"message": f"{filename} deleted successfully"}
     except Exception as e:
         logging.error(f"Error deleting file: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+    
+@router.put("/files/update")
+async def update_file_content(updated_document: UpdateDocument):
+    """
+    Endpoint to update the content of an existing file.
+    """
+    try:
+        doc_collection = collections["documents"]
+        result = doc_collection.update_one(
+            {"filename": updated_document.filename},
+            {"$set": {"content": updated_document.content, "uploaded_at": datetime.utcnow()}}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        return {"message": f"File '{updated_document.filename}' updated successfully"}
+    except Exception as e:
+        logging.error(f"Error updating file: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
