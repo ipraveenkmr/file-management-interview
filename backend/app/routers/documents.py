@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query
 from app.db import collections
 import logging
 from app.utils import serialize_document
@@ -66,16 +66,71 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
+# @router.get("/files/")
+# async def list_files(isSorted: bool = Query(default=False)):
+#     try:
+        
+#         doc_collection = collections["documents"]
+
+
+#         if isSorted:
+#             files = doc_collection.find({}, {"_id": 1, "filename": 1}).sort("uploaded_at", -1)
+#         else:
+#             files = doc_collection.find({}, {"_id": 1, "filename": 1})
+
+
+#         # files = doc_collection.find({}, {"_id": 1, "filename": 1}).sort("uploaded_at", -1)
+#         file_list = [{"id": str(file["_id"]), "filename": file["filename"]} for file in files]
+#         return {"files": file_list}
+#     except Exception as e:
+#         logging.error(f"Error listing files: {e}")
+#         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+from fastapi import APIRouter, Query, HTTPException
+from pymongo import ASCENDING, DESCENDING
+import logging
+
+router = APIRouter()
+
 @router.get("/files/")
-async def list_files():
+async def list_files(
+    isSorted: bool = Query(default=False),
+    page: int = Query(default=1, ge=1)
+):
+    """
+    List files with sorting and pagination.
+    
+    :param isSorted: Determines whether the files should be sorted by 'uploaded_at' in descending order.
+    :param page: The page number for pagination, defaults to 1.
+    """
     try:
         doc_collection = collections["documents"]
-        files = doc_collection.find({}, {"_id": 1, "filename": 1}).sort("uploaded_at", -1)
+        items_per_page = 2
+        skip = (page - 1) * items_per_page
+
+        # Sort if isSorted is True, otherwise fetch without sorting
+        if isSorted:
+            files = doc_collection.find({}, {"_id": 1, "filename": 1}).sort("uploaded_at", DESCENDING).skip(skip).limit(items_per_page)
+        else:
+            files = doc_collection.find({}, {"_id": 1, "filename": 1}).skip(skip).limit(items_per_page)
+
         file_list = [{"id": str(file["_id"]), "filename": file["filename"]} for file in files]
-        return {"files": file_list}
+
+        # Total files count for pagination info
+        total_files = doc_collection.count_documents({})
+        total_pages = (total_files + items_per_page - 1) // items_per_page
+
+        return {
+            "files": file_list,
+            "total_files": total_files,
+            "total_pages": total_pages,
+            "current_page": page,
+        }
     except Exception as e:
         logging.error(f"Error listing files: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @router.get("/files/{filename}")
 async def read_file(filename: str):

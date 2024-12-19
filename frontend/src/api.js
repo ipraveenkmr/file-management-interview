@@ -18,7 +18,7 @@ export const uploadFile = async (file) => {
 
 export const getFiles = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/documents/files/`);
+    const response = await axios.get(`${API_BASE_URL}/documents/files/?isSorted=${true}`);
     return response.data;
   } catch (error) {
     handleAxiosError(error);
