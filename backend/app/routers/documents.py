@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import os
 from datetime import datetime
+import traceback
 
 router = APIRouter()
 
@@ -35,8 +36,13 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(await file.read())
 
+        # Check if the file is text-based
+        if not file.content_type.startswith("text/"):
+            os.remove(file_path)
+            raise HTTPException(status_code=400, detail="Only text-based files are supported")
+
         # Read content from the file (assuming it's text-based)
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Save to MongoDB
@@ -52,9 +58,13 @@ async def upload_file(file: UploadFile = File(...)):
         os.remove(file_path)
 
         return {"message": "File uploaded successfully", "document_id": str(result.inserted_id)}
+    except HTTPException as e:
+        logging.error(f"HTTP Exception: {e.detail}")
+        raise e
     except Exception as e:
-        logging.error(f"Error uploading file: {e}")
+        logging.error(f"Error uploading file: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @router.get("/files/")
 async def list_files():
